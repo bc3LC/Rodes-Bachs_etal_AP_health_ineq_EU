@@ -17,7 +17,7 @@
 #' @param cluster_number desired number of clusters
 #' @param fig_name name of the figure
 #' @param type 'ap' or 'deaths'
-ml_clustering <- function(data, cluster_number, fig_name, type) {
+ml_clustering <- function(data, cluster_number, fig_name, type, title_tag) {
   # Convert each country's values to ranks
   ranked_data <- data %>%
     dplyr::select(-country) %>%
@@ -27,20 +27,52 @@ ml_clustering <- function(data, cluster_number, fig_name, type) {
   
   rownames(ranked_data) <- data$country  # Assign row names
   
+  # Check if too equal countries, and fix them
+    # full row
+    rows_all_equal <- apply(ranked_data, 1, function(x) length(unique(x)) == 1)
+    ranked_data[rows_all_equal, ] <- matrix(1:5, nrow = sum(rows_all_equal), ncol = ncol(ranked_data), byrow = TRUE)
+    
+    # paired values
+    ranked_data[] <- t(apply(ranked_data, 1, adjust_half_values))
+  
   # Compute Spearman correlation matrix
   cor_matrix <- cor(t(ranked_data), method = "spearman")
   
   # Convert to distance matrix (1 - correlation)
   dist_matrix <- as.dist(1 - cor_matrix)
   
+  # Make ctries more readable
+  iso2_codes <- attr(dist_matrix, "Labels")
+  country_names <- dplyr::case_when(
+    iso2_codes == "EL" ~ "Greece",
+    iso2_codes == "UK" ~ "United Kingdom",
+    iso2_codes == "BA" ~ "Bosn. & Hzv.",
+    iso2_codes == "XK" ~ "Kosovo",
+    iso2_codes == "MK" ~ "North Maced.",
+    TRUE ~ countrycode::countrycode(iso2_codes, origin = "iso2c", destination = "country.name")
+  )
+  attr(dist_matrix, "Labels") <- country_names
+  
   # Perform hierarchical clustering
   hc <- hclust(dist_matrix, method = "ward.D2")
   
   # Plot dendrogram
-  png(file.path("figures", paste0(fig_name, "_", type, ".png")), width = 800, height = 600)
-  plot(hc, main = "Hierarchical Clustering of Countries by Category Rankings")
-  dev.off()
-  
+  png(file.path("figures", paste0(fig_name, "_", type, ".png")), width = 800, height = 800)
+  dend <- as.dendrogram(hc)
+  plot(dend, 
+       main = NULL,# paste("Hierarchical Clustering of countries by",title_tag,"ranking"), 
+       cex.main = 1.5, 
+       cex.lab = 1.5, 
+       cex.axis = 1.5,
+       cex = 1.5,
+       lwd = 2,
+       xlab = "", 
+       axes = FALSE,
+       frame.plot = FALSE
+  )
+  axis(2, cex.axis=1.25)
+  mtext("Height", side = 2, line = 3, cex = 1.25)  # y-axis label
+  dev.off()  
   
   # Cut tree into clusters
   clusters <- cutree(hc, k = cluster_number)
@@ -63,8 +95,8 @@ ml_clustering <- function(data, cluster_number, fig_name, type) {
 #' @param type 'ap' or 'deaths'
 ml_do_all <- function(data, cluster_number, fig_name, 
                       fig_legend = NULL, fig_ox_label = NULL,
-                      type = '') {
-  ml_data <- ml_clustering(data, cluster_number, fig_name, type)  
+                      type = '', title_tag = '') {
+  ml_data <- ml_clustering(data, cluster_number, fig_name, type, title_tag)  
   
   to_analyze = ml_data %>% 
     dplyr::select(country, cluster) %>% 
@@ -86,7 +118,7 @@ ml_do_all <- function(data, cluster_number, fig_name,
       name = fig_legend,
       labels = quintiles.labs
     ) +
-    labs(x = fig_ox_label, y = "", fill = "Decile") +
+    labs(x = fig_ox_label, y = "") +
     theme(axis.text = element_text(size = 12))
   ggsave(
     file = file.path("figures",paste0(fig_name,"_",type,"_ordered.pdf")), 

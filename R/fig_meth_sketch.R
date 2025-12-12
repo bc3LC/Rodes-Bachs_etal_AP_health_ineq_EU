@@ -4,8 +4,8 @@
 # Date                  : Oct. 2025
 # Author                : Clàudia Rodés-Bachs
 # Institute             : BC3-Basque Centre for Climate Change
-# Description           : Analysis and figures' generation code 
-# Re-usage instructions : Execute this R script placing the data in the 'data' folder
+# Description           : Analysis and figures' generation code
+# Re-usage instructions : Execute this R script through the main.R script (to properly load all data and helper functions)
 
 ###############################################################################
 
@@ -44,7 +44,7 @@ if (map) {
                 lwd = 0.0001
     ) +
     tm_layout(legend.show = FALSE, frame = FALSE)
-  
+
   tmap::tmap_save(plot_ap,
                   filename = paste0("figures/meth_sketch/plot_ap_nuts3.pdf"),
                   width = 100, height = 100, units = "mm", dpi = 300
@@ -53,7 +53,7 @@ if (map) {
 
 
 # PM2.5 grid level
-pm25_weighted <- terra::rast("data/rfasst_output/EU_NECP_LTT_2030_pm25_fin_weighted.tif")
+pm25_weighted <- terra::rast("data/EU_NECP_LTT-Rev1.1_2030_pm25_fin_weighted.tif")
 png(filename = "figures/meth_sketch/plot_ap_grid_w.png",
     width = 100 * 3, height = 50 * 3, units = "mm", res = 300)
 terra::plot(pm25_weighted, col = grDevices::terrain.colors(50), axes = FALSE, box = FALSE, legend = FALSE)
@@ -61,22 +61,24 @@ dev.off()
 
 
 # PM2.5 regional level
-pm25_regional <- get(load("data/rfasst_output/necp_m2_get_conc_pm25.ctry_agg.output.RData"))
+pm25_regional <- read.csv("data/EU_NECP_LTT-Rev1.1_2030_WORLD-NUTS3_pm25_avg.csv") %>%
+  dplyr::rename(region = id_code,
+                value = pm25_avg)
 
 pm25_regional <- as.data.frame(rmap::mapCountries) %>%
   dplyr::mutate(subRegionAlt=as.character(subRegionAlt)) %>%
   dplyr::left_join(rfasst::fasst_reg,by="subRegionAlt") %>%
   dplyr::select(-subRegion) %>%
   dplyr::rename(subRegion=fasst_region) %>%
-  dplyr::mutate(subRegionAlt=as.factor(subRegionAlt)) %>% 
-  dplyr::left_join(get(load("figures/meth_sketch/pm25.map_data.RData")),
+  dplyr::mutate(subRegionAlt=as.factor(subRegionAlt)) %>%
+  dplyr::left_join(get(load("figures/pm25.map_data.RData")),
                  by = "subRegion",
                  relationship = "many-to-many")
 pm25_regional <- sf::st_sf(pm25_regional, geometry = pm25_regional$geometry)
 
 if (map) {
-  plot_ap <- 
-    tm_shape(pm25_regional %>% 
+  plot_ap <-
+    tm_shape(pm25_regional %>%
                dplyr::filter(year == 2005)) +
     tm_polygons("value",
                 title = "PM2.5\n[ug/m3]",
@@ -85,8 +87,8 @@ if (map) {
                 lwd = 0.00001
     ) +
     tm_layout(legend.show = FALSE, frame = FALSE)
-  
-  
+
+
   tmap::tmap_save(plot_ap,
                   filename = paste0("figures/meth_sketch/plot_ap_regional.pdf"),
                   width = 100, height = 50, units = "mm", dpi = 300
@@ -112,7 +114,7 @@ if (nrow(deaths_nuts3[rowSums(is.na(deaths_nuts3)) > 0, ]) != 0) {
 }
 
 if (map) {
-  plot_deaths <- 
+  plot_deaths <-
     tm_shape(nuts3_plot_data,
              projection = "EPSG:3035",
              xlim = c(2400000, 6500000),
@@ -126,11 +128,11 @@ if (map) {
     tm_polygons("deaths",
                 title = "Premature deaths\n[Deaths per 1M inhabitants]",
                 palette = "Oranges",
-                style = "cont",       
+                style = "cont",
                 lwd = 0.0001
     ) +
     tm_layout(legend.show = FALSE, frame = FALSE)
-  
+
   tmap::tmap_save(plot_deaths,
                   filename = paste0("figures/meth_sketch/plot_deaths_nuts3", normalized_tag, ".pdf"),
                   width = 100, height = 100, units = "mm", dpi = 300
@@ -141,10 +143,10 @@ if (map) {
 
 extent_raster <- terra::ext(-26.276, 40.215, 32.633, 71.141)
 
-pm.pre <- terra::rast(paste0('../../GitHub/rfasst_v2/output/m2/pm25_gridded/raster_grid/EU_NECP_LTT_2030_pm25_fin_weighted.tif'))
+pm.pre <- terra::rast(paste0('data/EU_NECP_LTT-Rev1.1_2030_pm25_fin_weighted.tif'))
 pm.pre <- terra::crop(pm.pre, extent_raster)
 
-pm.mort_yy <- get(load(paste0('../../GitHub/rfasst_v2/output/m3/pm25_gridded/EUR_grid/pm.mort_mat_2030_norm_EU_NECP_LTT.RData')))
+pm.mort_yy <- get(load(paste0('data/EU_NECP_LTT-Rev1.1_2030_pm25_fin_weighted.tif')))
 vec <- as.vector(pm.mort_yy[['total']])
 pm.mort_rast <- terra::setValues(pm.pre, vec)
 
@@ -178,20 +180,20 @@ dev.off()
 ## AP vs urbn_type  ============================================================
 ap_geo_urbn_type <- data.table::as.data.table(ap_socioecon_sf) %>%
   dplyr::select(geo, urbn_type, ap)
-ap_geo_urbn_type <- unique(ap_geo_urbn_type) %>% 
-  dplyr::filter(rowSums(is.na(.)) == 0, ap != 0) %>% 
-  dplyr::mutate(quintile = urbn_type) %>% 
-  dplyr::group_by(quintile) %>% 
+ap_geo_urbn_type <- unique(ap_geo_urbn_type) %>%
+  dplyr::filter(rowSums(is.na(.)) == 0, ap != 0) %>%
+  dplyr::mutate(quintile = urbn_type) %>%
+  dplyr::group_by(quintile) %>%
   dplyr::mutate(c05 = quantile(ap, 0.05),
                 c33 = quantile(ap, 0.33),
                 c50 = quantile(ap, 0.50),
                 c66 = quantile(ap, 0.66),
-                c95 = quantile(ap, 0.95)) %>% 
+                c95 = quantile(ap, 0.95)) %>%
   dplyr::ungroup()
 
-plot_ap_urbn_type <- prob_jitter_plot(ap_geo_urbn_type %>% 
-                                        dplyr::rename(item = ap), 
-                                      legend_title = 'Settlement type', 
+plot_ap_urbn_type <- prob_jitter_plot(ap_geo_urbn_type %>%
+                                        dplyr::rename(item = ap),
+                                      legend_title = 'Settlement type',
                                       legend_type = 'urbn_type',
                                       ox_text = 'PM2.5 concentration [ug/m3]')
 ggsave(
@@ -214,10 +216,13 @@ world <- sf::st_make_valid(world)
 world <- sf::st_wrap_dateline(world, options = c("WRAPDATELINE=YES"))
 
 # Define EU country codes based on nuts3_plot_data
-eu_countries <- unique(nuts3_plot_data$CNTR_CODE)
+eu_countries <- c(unique(nuts3_plot_data$CNTR_CODE), 'BA', 'XK')
 
 # Add a column to classify EU and non-EU countries
 world <- world %>%
+  dplyr::mutate(iso_a2 = dplyr::if_else(is.na(iso_a2) | iso_a2 == -99, iso_a2_eh, iso_a2)) %>%
+  dplyr::mutate(iso_a2 = dplyr::if_else(iso_a2 == 'GB', 'UK', iso_a2)) %>%
+  dplyr::mutate(iso_a2 = dplyr::if_else(iso_a2 == 'GR', 'EL', iso_a2)) %>%
   dplyr::mutate(eu_status = ifelse(iso_a2 %in% eu_countries, "EU", "Non-EU"))
 world <- world %>% dplyr::filter(continent != "Antarctica")
 world <- world %>% dplyr::filter(sf::st_area(geometry) > units::set_units(1000, "km^2"))
