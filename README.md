@@ -14,6 +14,8 @@ Clàudia Rodés-Bachs<sup>1</sup>, Jon Sampedro<sup>1,2</sup>, Mercè Amich<sup>
 
 \* corresponding author:  claudia.rodes@bc3research.org
 
+**Publication published [here](https://www.thelancet.com/journals/lanepe/article/PIIS2666-7762(26)00166-3/fulltext), in The Lancet Regional Heatlth - Europe.**
+
 ## Abstract
 Background Outdoor air pollution poses a major threat to human health and is closely interlinked to climate change, as both stem largely from the same emission sources and pollutants affect both health and climate. Despite sustained mitigation efforts, over 239,000 premature deaths in Europe were attributed to PM2.5 exposure in 2022, while climate policies are projected to yield substantial yet insufficient co-benefits by 2030, with uneven impacts across regions and socioeconomic groups.
 
